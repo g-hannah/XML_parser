@@ -402,16 +402,14 @@ fail:
 
 #define NSET_VALUE(n,v) ((n)->value = strdup((v)))
 
-static node_ptr parent = NULL;
-static node_ptr node = NULL;
+//static node_ptr parent = NULL;
+//static node_ptr node = NULL;
 
 #define STACK_MAX_DEPTH 256
 static node_ptr node_stack[STACK_MAX_DEPTH];
-static node_ptr search_stack[STACK_MAX_DEPTH];
 static char *stack[STACK_MAX_DEPTH];
 static int pnode_idx = 0;
 static int stack_idx = 0;
-static int snode_idx = 0;
 
 #define CLEAR_STACK() memset(stack, 0, sizeof(char *) * STACK_MAX_DEPTH)
 
@@ -462,20 +460,7 @@ do { \
 	node_stack[--pnode_idx]; \
 })
 
-#define PUSH_NODE(p) \
-do { \
-	assert(snode_idx < STACK_MAX_DEPTH); \
-	search_stack[snode_idx++] = (p); \
-} while (0)
-
-#define POP_NODE(p) \
-({ \
-	assert(0 != snode_idx); \
-	search_stack[--snode_idx]; \
-})
-
 #define CLEAR_NODE_STACK() memset(node_stack, 0, sizeof(node_ptr) * STACK_MAX_DEPTH)
-#define CLEAR_SEARCH_STACK() memset(search_stack, 0, sizeof(node_ptr) * STACK_MAX_DEPTH)
 
 static node_ptr
 new_node(void)
@@ -935,6 +920,9 @@ int
 do_parse(struct XML *xml)
 {
 	assert(xml);
+
+	node_ptr parent = NULL;
+	node_ptr node = NULL;
 
 	xml->root = new_node();
 	node_ptr r = xml->root;
