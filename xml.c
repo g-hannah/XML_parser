@@ -703,7 +703,7 @@ XML_find_by_path(struct XML *xml, char *path)
 		{
 			if (tokens[itok] == NULL) // we're done
 			{
-				goto found; // return PARENT
+				goto found;
 			}
 			else
 			{
