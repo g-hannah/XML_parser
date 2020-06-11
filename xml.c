@@ -942,6 +942,7 @@ do_parse(struct XML *xml)
 
 	while (ptr < end)
 	{
+		Debug("%c\n", *(ptr-1));
 		switch(lookahead)
 		{
 			case TOK_OPEN:
@@ -1041,7 +1042,14 @@ do_parse(struct XML *xml)
 
 				if (matches(TOK_CHARSEQ))
 				{
-					parse_token();
+					char *s = ptr;
+
+					while (isascii(*ptr) && *ptr != OTAG)
+						++ptr;
+
+					strncpy(token, s, ptr - s);
+					token[ptr - s] = 0;
+
 					node->value = strdup(token);
 				}
 				else
@@ -1129,9 +1137,6 @@ XML_new(void)
 int
 main(int argc, char *argv[])
 {
-	if (setup(argv[1]) < 0) // argv[1] has xml filename
-		goto fail;
-
 	struct XML *xml = XML_new();
 
 	if (0 != XML_parse_file(xml, argv[1]))
