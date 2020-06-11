@@ -598,11 +598,14 @@ do_free_tree(node_ptr root)
 void
 XML_free(struct XML *xml)
 {
+	if (NULL == xml || NULL == xml->root)
+		return;
+
 	do_free_tree(xml->root);
 
 	Debug("Freeing tree root\n");
 
-	free(NVALUE(xml->root)); // the strdup of "root"
+	free(NNAME(xml->root)); // strdup() of "root"
 	free(xml->root);
 
 	Debug("Freeing tree object\n");
