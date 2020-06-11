@@ -165,14 +165,15 @@ static char attribute_value[ATTRIBUTE_VALUE_MAX];
 static void
 parse_attribute_name(void)
 {
-	char *s = ptr;
-
 	/*
 	 * Might be at a space char, so skip it.
 	 * If not, we're at an alpha char, and
 	 * lex() will not advance PTR.
 	 */
 	advance();
+
+	char *s = ptr;
+
 	while (isattribnamechar(*ptr))
 		++ptr;
 
