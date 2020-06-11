@@ -7,8 +7,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "../include/string_utils.h"
-#include "../include/xml.h"
+#include "xml.h"
 
 struct XML
 {
@@ -26,14 +25,6 @@ struct XML_result
 	xml_node_t *nodes;
 	int nr_nodes;
 };
-
-/*
- * TODO
- *
- * Handle XML comments: <!-- comment -->
- */
-
-//#define INFILE "./config.xml"
 
 #define __ctor __attribute__((constructor))
 #define __dtor __attribute__((destructor))
