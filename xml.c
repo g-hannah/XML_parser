@@ -9,23 +9,6 @@
 #include <unistd.h>
 #include "xml.h"
 
-struct XML
-{
-	xml_node_t *root;
-	int nr_nodes;
-
-	int (*parse)(struct XML *, char *); // xml->parse(xml, "sample.xml");
-	xml_node_t *(*find)(struct XML *, char *); // xml->find(xml, "options/crawl-delay");
-	void (*walk_tree)(struct XML *); // xml->walk_tree(xml->root);
-	void (*free_tree)(struct XML *); // xml->free_tree(xml->root);
-};
-
-struct XML_result
-{
-	xml_node_t *nodes;
-	int nr_nodes;
-};
-
 #define __ctor __attribute__((constructor))
 #define __dtor __attribute__((destructor))
 #define ALIGN16(s) (((s) + 0xf) & ~(0xf))
@@ -626,6 +609,20 @@ do_free_tree(node_ptr root)
 	return;
 }
 
+void
+XML_free(struct XML *xml)
+{
+	do_free_tree(xml->root);
+
+	Debug("Freeing tree root\n");
+
+	free(NVALUE(xml->root)); // the strdup of "root"
+	free(xml->root);
+
+	Debug("Freeing tree object\n");
+	free(xml);
+}
+
 /**
  * Find the node whose child has VALUE
  * e.g.,
@@ -636,7 +633,7 @@ do_free_tree(node_ptr root)
  * Searching for "name of an option"
  * would return parent node <option>
  */
-static xml_node_t *
+xml_node_t *
 XML_find_parent_node_for_value(xml_node_t *root, char *value)
 {
 	assert(root);
@@ -676,11 +673,11 @@ XML_find_parent_node_for_value(xml_node_t *root, char *value)
  * Return the node corresponding to
  * dependencies if found.
  */
-static xml_node_t *
-XML_find(struct XML *xml, char *wanted)
+xml_node_t *
+XML_find_by_path(struct XML *xml, char *path)
 {
 	assert(xml);
-	assert(wanted);
+	assert(path);
 	assert(xml->root);
 
 	int inode;
@@ -688,7 +685,7 @@ XML_find(struct XML *xml, char *wanted)
 	int nch;
 	node_ptr parent = xml->root;
 	node_ptr node;
-	char **tokens = tokenize_query(wanted);
+	char **tokens = tokenize_query(path);
 	char *tok;
 	size_t tlen;
 
@@ -699,9 +696,6 @@ XML_find(struct XML *xml, char *wanted)
 	inode = 0;
 
 	int j;
-
-	for (j = 0; tokens[j] != NULL; ++j)
-		fprintf(stderr, "token %d: %s\n", j, tokens[j]);
 
 	if (0 == nch)
 		goto not_found;
@@ -757,12 +751,12 @@ not_found:
 
 found:
 	free_token_array(tokens);
-//	assert(NULL != value);
-//	return value;
+
+	assert(NULL != node);
 	return node;
 }
 
-static char *
+char *
 XML_get_node_value(xml_node_t *root, char *name)
 {
 	assert(root);
@@ -797,20 +791,6 @@ XML_get_node_value(xml_node_t *root, char *name)
 	}
 
 	return NULL;
-}
-
-static void
-XML_free_tree(struct XML *xml)
-{
-	do_free_tree(xml->root);
-
-	Debug("Freeing tree root\n");
-
-	free(NVALUE(xml->root)); // the strdup of "XML_ROOT_NODE"
-	free(xml->root);
-
-	Debug("Freeing tree object\n");
-	free(xml);
 }
 
 static int
@@ -1110,9 +1090,9 @@ do_parse(struct XML *xml)
 	return 0;
 }
 
-#define XML_VERSION_PATTERN "<?xml version=\"[^\"]*\"\\( [a-zA-Z]*=\"[^\"]*\"\\)*?>"
+//#define XML_VERSION_PATTERN "<?xml version=\"[^\"]*\"\\( [a-zA-Z]*=\"[^\"]*\"\\)*?>"
 int
-XML_parse(struct XML *xml, char *path)
+XML_parse_file(struct XML *xml, char *path)
 {
 	assert(xml);
 	assert(path);
@@ -1141,15 +1121,15 @@ fail:
 	return -1;
 }
 
-static struct XML *
+struct XML *
 XML_new(void)
 {
 	struct XML *xml = malloc(sizeof(struct XML));
 
-	xml->parse = XML_parse;
-	xml->find = XML_find;
-	xml->walk_tree = XML_walk_tree;
-	xml->free_tree = XML_free_tree;
+	if (NULL == xml)
+		return NULL;
+
+	memset(xml, 0, sizeof(*xml));
 
 	return xml;
 }
@@ -1162,11 +1142,11 @@ main(int argc, char *argv[])
 
 	struct XML *xml = XML_new();
 
-	if (0 != xml->parse(xml, argv[1]))
+	if (0 != XML_parse_file(xml, argv[1]))
 		goto fail;
 
 	char *query = strdup("project/dependencies");
-	node_ptr p = xml->find(xml, query);
+	node_ptr p = XML_find_by_path(xml, query);
 
 	if (p)
 	{
@@ -1198,8 +1178,8 @@ main(int argc, char *argv[])
 
 	free(query);
 
-	xml->walk_tree(xml);
-	xml->free_tree(xml);
+	XML_walk_tree(xml);
+	XML_free(xml);
 
 	return 0;
 fail:
