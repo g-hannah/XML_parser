@@ -34,14 +34,14 @@
 #define COLON		':'
 #define EXCL		'!'
 #define PERIOD		'.'
-
-#define iscntrlspace(p) ((p) == '\t' || (p) == '\r' || (p) == '\n')
+#define HASH		'#'
 
 #define istagnamechar(c) \
 	isalnum((c)) || \
 	(c) == PERIOD || \
 	(c) == DASH || \
-	(c) == UNDER
+	(c) == UNDER || \
+	(c) == COLON
 
 #define istokenchar(c) \
 	isascii((c)) && \
@@ -60,13 +60,14 @@
 	(c) == PERIOD || \
 	(c) == DASH || \
 	(c) == UNDER || \
-	(c) == COLON
+	(c) == COLON || \
+	(c) == HASH
 
 static int lex(void);
 static int matches(int);
 static void advance(void);
 static void parse_token(void);
-static void parse_terminal(void);
+//static void parse_terminal(void);
 //static void parse_tagname(void);
 
 static void Debug(char *, ...);
@@ -684,8 +685,6 @@ XML_find_by_path(struct XML *xml, char *path)
 	itok = 0;
 	inode = 0;
 
-	int j;
-
 	if (0 == nch)
 		goto not_found;
 
@@ -772,8 +771,6 @@ XML_get_node_value(xml_node_t *root, char *name)
 		if (!cmp)
 			return node->value;
 
-	recur:
-
 		value = XML_get_node_value(node, name);
 		if (NULL != value)
 			return value;
@@ -786,6 +783,16 @@ static int
 matches(int tok)
 {
 	return (lookahead == tok);
+}
+
+static void
+reverse(void)
+{
+	if (ptr == buffer)
+		return;
+
+	lookahead = current;
+	--ptr;
 }
 
 static void
@@ -861,8 +868,15 @@ get_expr:
 static int
 lex(void)
 {
-	while (iscntrlspace(*ptr)) // skip CR NL TAB
+#define IS_CNTRLSPACE(p) ((p) == '\r' || (p) == '\n' || (p) == '\t')
+	while (IS_CNTRLSPACE(*ptr))
 		++ptr;
+
+	if (*ptr == SPACE && !isalnum(*(ptr-1)))
+	{
+		while (*ptr == SPACE)
+			++ptr;
+	}
 
 	switch(*ptr)
 	{
@@ -942,7 +956,6 @@ do_parse(struct XML *xml)
 
 	while (ptr < end)
 	{
-		Debug("%c\n", *(ptr-1));
 		switch(lookahead)
 		{
 			case TOK_OPEN:
@@ -1040,12 +1053,31 @@ do_parse(struct XML *xml)
 
 				advance();
 
-				if (matches(TOK_CHARSEQ))
+			/*
+			 * If there's no value, then we should match a '<' character.
+			 * Otherwise, we have a value to parse.
+			 */
+				if (!matches(TOK_OPEN))
 				{
+					if (!matches(TOK_CHARSEQ))
+					{
+						/*
+						 * Values could start with a non alnum char,
+						 * such as '/'. In that case, when we called
+						 * advance() above, we would have consumed
+						 * that character. We need to backup now.
+						 */
+
+						while (*ptr != ETAG)
+							--ptr;
+
+						++ptr;
+					}
+
 					char *s = ptr;
 
-					while (isascii(*ptr) && *ptr != OTAG)
-						++ptr;
+					ptr = memchr(ptr, OTAG, end - ptr);
+					assert(ptr);
 
 					strncpy(token, s, ptr - s);
 					token[ptr - s] = 0;
@@ -1053,7 +1085,9 @@ do_parse(struct XML *xml)
 					node->value = strdup(token);
 				}
 				else
-					continue;
+				{
+					reverse();
+				}
 
 				break;
 
